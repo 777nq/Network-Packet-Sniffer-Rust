@@ -1,0 +1,55 @@
+extern crate pcap;
+
+use pcap::{Device, Packet};
+use std::collections::HashMap;
+use std::io::{self, Write};
+
+fn main() {
+    // List available network devices
+    let devices = Device::list().unwrap();
+    println!("Available network devices:");
+    for (i, device) in devices.iter().enumerate() {
+        println!("{}: {}", i + 1, device.name);
+    }
+
+    // Choose a device to capture packets
+    println!("Enter the number of the device to use:");
+    let mut device_choice = String::new();
+    io::stdin()
+        .read_line(&mut device_choice)
+        .expect("Failed to read input");
+    let device_index: usize = device_choice
+        .trim()
+        .parse()
+        .expect("Invalid device number");
+
+    let selected_device = &devices[device_index - 1];
+    println!("Selected device: {}", selected_device.name);
+
+    // Open the selected device for packet capture
+    let cap = Device::lookup().unwrap().open().unwrap();
+
+    // Start packet capture loop
+    println!("Capturing packets. Press Ctrl+C to exit.");
+    let mut packet_counts: HashMap<String, u32> = HashMap::new();
+    for packet in cap {
+        match packet {
+            Ok(packet) => {
+                // Count packet types (e.g., TCP, UDP, ICMP)
+                let packet_type = format!("{:?}", packet.header);
+                let count = packet_counts.entry(packet_type.clone()).or_insert(0);
+                *count += 1;
+
+                // Print packet details
+                println!(
+                    "Packet Type: {}\nPacket Length: {} bytes",
+                    packet_type,
+                    packet.data.len()
+                );
+            }
+            Err(err) => {
+                eprintln!("Error while capturing packet: {:?}", err);
+            }
+        }
+    }
+}
